@@ -38,6 +38,8 @@ import net.sourceforge.plantuml.FileFormat;
 import net.sourceforge.plantuml.FileFormatOption;
 import net.sourceforge.plantuml.NullOutputStream;
 import net.sourceforge.plantuml.SourceStringReader;
+import net.sourceforge.plantuml.UmlDiagram;
+import net.sourceforge.plantuml.UmlDiagramType;
 import net.sourceforge.plantuml.StringUtils;
 import net.sourceforge.plantuml.code.Base64Coder;
 import net.sourceforge.plantuml.core.DiagramDescription;
@@ -68,6 +70,24 @@ class DiagramResponse {
         map.put(FileFormat.UTXT, "text/plain;charset=UTF-8");
         map.put(FileFormat.BASE64, "text/plain; charset=x-user-defined");
         CONTENT_TYPE = Collections.unmodifiableMap(map);
+    }
+    private static final Map<UmlDiagramType, String> TYPE_MAPPING;
+    static {
+        Map<UmlDiagramType, String> typeMap = new HashMap<UmlDiagramType, String>();
+        typeMap.put(UmlDiagramType.SEQUENCE, "sequence");
+        typeMap.put(UmlDiagramType.STATE, "state");
+        typeMap.put(UmlDiagramType.CLASS, "class");
+        typeMap.put(UmlDiagramType.ACTIVITY, "sequence");
+        typeMap.put(UmlDiagramType.DESCRIPTION, "description");
+        typeMap.put(UmlDiagramType.OBJECT, "object");
+        typeMap.put(UmlDiagramType.FLOW, "flow");
+        typeMap.put(UmlDiagramType.COMPOSITE, "composite");
+        typeMap.put(UmlDiagramType.TIMING, "timing");
+        typeMap.put(UmlDiagramType.BPM, "bpm");
+        typeMap.put(UmlDiagramType.NWDIAG, "nwdiag");
+        typeMap.put(UmlDiagramType.MINDMAP, "mindmap");
+        typeMap.put(UmlDiagramType.WBS, "wbs");
+        TYPE_MAPPING = Collections.unmodifiableMap(typeMap);
     }
 
     DiagramResponse(HttpServletResponse r, FileFormat f, HttpServletRequest rq) {
@@ -143,7 +163,8 @@ class DiagramResponse {
             new NullOutputStream(), new FileFormatOption(FileFormat.PNG, false));
         PrintWriter httpOut = response.getWriter();
         httpOut.print(desc.getDescription());
- }
+    }
+
     private void addHeaderForCache(BlockUml blockUml) {
         long today = System.currentTimeMillis();
         // Add http headers to force the browser to cache the image
@@ -157,6 +178,7 @@ class DiagramResponse {
         response.addHeader("Etag", "\"" + blockUml.etag() + "\"");
         final Diagram diagram = blockUml.getDiagram();
         response.addHeader("X-PlantUML-Diagram-Description", diagram.getDescription().getDescription());
+        response.addHeader("X-PlantUML-Diagram-Type", diagramType(diagram));
         if (diagram instanceof PSystemError) {
             final PSystemError error = (PSystemError) diagram;
             for (ErrorUml err : error.getErrorsUml()) {
@@ -165,6 +187,15 @@ class DiagramResponse {
             }
         }
         addHeaders(response);
+    }
+
+
+    private String diagramType(Diagram diagram) {
+        if (!(diagram instanceof UmlDiagram)) {
+            return "unknown type";
+        }
+        UmlDiagram uml = (UmlDiagram) diagram;
+        return TYPE_MAPPING.getOrDefault(uml.getUmlDiagramType(), "unknown");
     }
 
     public static void addHeaders(HttpServletResponse response) {
